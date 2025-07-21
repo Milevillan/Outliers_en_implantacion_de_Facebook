@@ -22,17 +22,231 @@ library(countrycode)
 library(moments)
 library(scales) 
 library(stargazer) 
+library(MASS)
 
-# Cargar el dataset 'fb_final.csv' directamente desde la URL
+
+# URL del dataset
 data_url <- "https://raw.githubusercontent.com/griu/mbdds_fc20/master/gestion_datos/www/fb_final.csv"
-datos_facebook <- read_csv2(data_url)
 
-# Verificación inicial de los datos
- head(datos_facebook) # Muestra las primeras filas del dataframe cargado
- summary(datos_facebook) # Proporciona un resumen estadístico de las columnas
- colnames(datos_facebook) # Muestra los nombres de las columnas
+# Cargar el dataset con read_delim(), especificando separador y decimal
+datos_facebook <- read_delim(
+  data_url,
+  delim = ";",
+  locale = locale(decimal_mark = ","),
+  col_types = cols(
+    country_norm = col_character(),
+    anyo = col_double(),
+    facebook_num = col_double(),
+    internet_por_num = col_double(),
+    poblacion_num = col_double()
+  )
+)
+
+print(head(datos_facebook))
 
 ```
 ## 1. Analiza mediante summary y boxplot, si hay (o no) países outliers respecto a la variable Facebook_por_Internet. Identifica cuáles son.
 
+```{r}
+# Crear variables necesarias
+datos_facebook <- datos_facebook %>%
+  mutate(
+    facebook_por_num = facebook_num / poblacion_num * 100,
+    facebook_por_internet = facebook_num / (poblacion_num * internet_por_num / 100) * 100
+  )
 
+# Análisis descriptivo
+summary(datos_facebook$facebook_por_internet)
+
+# Boxplot
+boxplot(datos_facebook$facebook_por_internet,
+        main = "Boxplot de Facebook_por_Internet",
+        col = "skyblue",
+        horizontal = TRUE,
+        xlab = "% de usuarios de Internet que usan Facebook")
+
+# Detectar outliers
+
+# Cálculo de límites usando IQR
+Q1 <- quantile(datos_facebook$facebook_por_internet, 0.25, na.rm = TRUE)
+Q3 <- quantile(datos_facebook$facebook_por_internet, 0.75, na.rm = TRUE)
+IQR <- Q3 - Q1
+
+lim_inf <- Q1 - 1.5 * IQR
+lim_sup <- Q3 + 1.5 * IQR
+
+# Filtrar países con valores extremos
+outliers <- datos_facebook %>%
+  filter(facebook_por_internet < lim_inf | facebook_por_internet > lim_sup) %>%
+  dplyr::select(country_norm, anyo, facebook_por_internet) # <- CAMBIO AQUÍ: dplyr::select
+
+
+# Mostrar tabla de resultados
+knitr::kable(outliers, caption = "Países identificados como outliers en Facebook_por_Internet")
+
+
+```
+En el análisis de la variable **Facebook_por_Internet** se observan cuatro valores extremos al identificar como outliers aquellos datos que se alejan más de 1.5 veces el rango intercuartílico (IQR) del primer o tercer cuartil. Estos casos específicos corresponden a Bolivia (2023), Camboya (2023) y El Salvador (2023) e Indonesia (2010). 
+
+En cuanto a la naturaleza de estos outliers sugiere una inconsistencia lógica en los datos, donde el porcentaje de usuarios de Facebook sobrepasa el 100% de los usuarios de Internet. Dado que el acceso a Internet es un prerrequisito para la utilización de Facebook, esta anomalía indica probablemente un error de medición, ya sea en las cifras de penetración de Internet o en el recuento de usuarios de Facebook para los países y años mencionados.
+
+
+## 2. Ajusta, de nuevo, los modelos de la actividad 4 de facebook_por_num sobre internet_por_num separados por año. Dibuja el primer plot (es decir, plot(modelo,1)) del modelo de regresión de cada año. Analiza los residuos de cada modelo (2010 y 2023) e identifica los países outliers con un nivel de confianza del 95% en 2010 y en 2023. Comenta si son distintos a los outliers detectados en el punto anterior mediante boxplot.
+
+
+```{r}
+
+# Filtrar datos para 2010 y 2023, y crear rownames concatenando país y año
+datos_2010 <- datos_facebook %>%
+  filter(anyo == 2010) %>%
+  filter(!is.na(facebook_num), !is.na(internet_por_num)) %>%
+  mutate(id = paste(country_norm, anyo, sep = "_")) %>%
+  column_to_rownames("id")
+
+datos_2023 <- datos_facebook %>%
+  filter(anyo == 2023) %>%
+  filter(!is.na(facebook_num), !is.na(internet_por_num)) %>%
+  mutate(id = paste(country_norm, anyo, sep = "_")) %>%
+  column_to_rownames("id")
+
+# Ajustar modelo lineal para 2010
+modelo_2010 <- lm(facebook_num ~ internet_por_num, data = datos_2010)
+
+# Ajustar modelo lineal para 2023
+modelo_2023 <- lm(facebook_num ~ internet_por_num, data = datos_2023)
+
+# Dibujar el primer plot (residuos vs valores ajustados) para cada modelo
+par(mfrow = c(1, 2)) # Dos gráficos lado a lado
+
+plot(modelo_2010, which = 1, main = "Residuos vs Ajustados (2010)")
+plot(modelo_2023, which = 1, main = "Residuos vs Ajustados (2023)")
+
+par(mfrow = c(1,1)) # Volver a 1 gráfico
+
+# Identificar outliers mediante residuos studentizados (95% nivel confianza ~ ±2)
+resid_2010 <- rstudent(modelo_2010)
+resid_2023 <- rstudent(modelo_2023)
+
+outliers_2010 <- names(resid_2010)[abs(resid_2010) > 2]
+outliers_2023 <- names(resid_2023)[abs(resid_2023) > 2]
+
+cat("\n--- Países outliers (residuos studentizados > 2) en 2010 ---\n")
+print(outliers_2010)
+
+cat("\n--- Países outliers (residuos studentizados > 2) en 2023 ---\n")
+print(outliers_2023)
+```
+
+## 3. De forma cualitativa, comenta: ¿cuál puede ser la causa de la presencia de estos outliers en 2010? ¿Y en 2023?
+
+Vemos valores de usuarios de Facebook mayores que el total estimado de usuarios con internet, lo más probable es que se deban a usuarios múltiples, datos de internet poco precisos o estimados, o diferentes fuentes y métodos de cálculo.
+
+
+## 4. A partir del plot 4 y 5 del modelo, comenta si los valores de Leverage y la D Cook indican la presencia de outliers. En cada caso comenta si estos valores indican que hay o no un impacto relevante sobre el ajuste de la regresión y porqué.
+
+```{r}
+# Filtrar datos para 2010 y 2023
+datos_2010 <- datos_facebook %>% filter(anyo == 2010) %>% drop_na(facebook_num, internet_por_num)
+datos_2023 <- datos_facebook %>% filter(anyo == 2023) %>% drop_na(facebook_num, internet_por_num)
+
+# Ajustar modelos
+modelo_2010 <- lm(facebook_num ~ internet_por_num, data = datos_2010)
+modelo_2023 <- lm(facebook_num ~ internet_por_num, data = datos_2023)
+
+# Plot 4 y 5 para 2010
+par(mfrow = c(1,2))
+plot(modelo_2010, which = 4, main = "2010 - Leverage vs Residuals")
+plot(modelo_2010, which = 5, main = "2010 - Cook's Distance")
+
+# Plot 4 y 5 para 2023
+par(mfrow = c(1,2))
+plot(modelo_2023, which = 4, main = "2023 - Leverage vs Residuals")
+plot(modelo_2023, which = 5, main = "2023 - Cook's Distance")
+
+# Valores numéricos de Leverage y Cook's Distance para análisis
+leverage_2010 <- hatvalues(modelo_2010)
+cooks_2010 <- cooks.distance(modelo_2010)
+
+leverage_2023 <- hatvalues(modelo_2023)
+cooks_2023 <- cooks.distance(modelo_2023)
+
+# Combinar con nombres de países para identificar observaciones
+datos_2010_outliers <- datos_2010 %>%
+  mutate(leverage = leverage_2010,
+         cooks_distance = cooks_2010) %>%
+  filter(leverage > 2*mean(leverage) | cooks_distance > 4/(nrow(datos_2010) - length(coef(modelo_2010))))
+
+datos_2023_outliers <- datos_2023 %>%
+  mutate(leverage = leverage_2023,
+         cooks_distance = cooks_2023) %>%
+  filter(leverage > 2*mean(leverage) | cooks_distance > 4/(nrow(datos_2023) - length(coef(modelo_2023))))
+
+# Mostrar posibles outliers con valores altos de leverage o Cook's Distance
+print("Outliers 2010 (Leverage o Cook's D altos):")
+print(datos_2010_outliers %>% select(country_norm, internet_por_num, facebook_num, leverage, cooks_distance))
+
+print("Outliers 2023 (Leverage o Cook's D altos):")
+print(datos_2023_outliers %>% select(country_norm, internet_por_num, facebook_num, leverage, cooks_distance))
+```
+
+En 2010, países como Uganda, Mozambique o Afghanistan presentan valores de leverage altos, ya que tienen muy baja penetración de internet.
+
+En 2023, se observa mayor homogeneidad, pero países como United States o Pakistan destacan en leverage por su alto número de usuarios.
+
+En 2010, el país con mayor Cook’s Distance fue United States, indicando que su eliminación alteraría significativamente el ajuste.
+
+En 2023, United States también lidera en influencia, seguido por Pakistan o Indonesia.
+
+Conclusión:
+Sí existen países con alta influencia sobre el modelo, según Cook’s Distance.
+
+Algunos países con residuos moderados pueden tener alta distancia de Cook si su leverage es alto (por ejemplo, valores extremos de internet).
+
+No todos los outliers detectados por residuos coinciden con los de Cook/Leverage. Por tanto, ambos análisis son complementarios: los residuos nos indican si el país se ajusta mal, y Cook/Leverage si tiene un impacto fuerte en la recta.
+
+
+## 5. Ajusta, ahora, los mismos modelos que en el punto 3, utilizando la versión robusta rlm de la librería MASS (algoritmo de los M-Estimadores). Presenta la comparación de los modelos lm y rlm mediante la función stargazer y en un gráfico de dispersión con las rectas de regresión (lm, rlm y loess). Comenta si observas cambios relevantes en el gráfico de las rectas de regresión, y en los coeficientes del modelo rlm respecto al modelo lm (algoritmo de mínimos cuadrados).
+
+```{r}
+# Modelos clásicos
+modelo_lm_2010 <- lm(facebook_num ~ internet_por_num, data = datos_2010)
+modelo_lm_2023 <- lm(facebook_num ~ internet_por_num, data = datos_2023)
+
+# Modelos robustos con rlm (M-estimadores)
+modelo_rlm_2010 <- rlm(facebook_num ~ internet_por_num, data = datos_2010)
+modelo_rlm_2023 <- rlm(facebook_num ~ internet_por_num, data = datos_2023)
+
+stargazer(modelo_lm_2010, modelo_rlm_2010,
+          modelo_lm_2023, modelo_rlm_2023,
+          type = "text",
+          title = "Comparación modelos LM y RLM (2010 y 2023)",
+          column.labels = c("LM 2010", "RLM 2010", "LM 2023", "RLM 2023"),
+          digits = 3)
+# Añadimos año como columna para facilitar uso en ggplot
+datos_modelos <- datos_facebook %>%
+  filter(anyo %in% c(2010, 2023)) %>%
+  filter(!is.na(facebook_num), !is.na(internet_por_num))
+
+ggplot(datos_modelos, aes(x = internet_por_num, y = facebook_num)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue", linetype = "dashed") +
+  geom_smooth(method = "loess", se = FALSE, color = "green", linetype = "dotted") +
+  # Agregar línea RLM manualmente
+  geom_abline(
+    slope = coef(modelo_rlm_2010)[2], intercept = coef(modelo_rlm_2010)[1],
+    color = "red", linetype = "solid"
+  ) +
+  facet_wrap(~anyo, scales = "free") +
+  labs(
+    title = "Comparación de rectas de regresión (LM, RLM, LOESS)",
+    subtitle = "Facebook vs Internet por país (2010 y 2023)",
+    x = "Usuarios de Internet (%)",
+    y = "Usuarios de Facebook (número)"
+  ) +
+  theme_minimal()
+
+```
+
+Al comparar los modelos clásicos (lm) y robustos (rlm), se observa que los coeficientes pueden diferir ligeramente, especialmente en 2010. Esto indica que el modelo clásico fue más sensible a los outliers.
+En el gráfico, la línea roja (modelo robusto) difiere de la azul (LM) principalmente en el tramo bajo de internet (países con menor conectividad), donde algunos valores atípicos afectan al ajuste.
+La línea loess (verde) actúa como referencia no paramétrica: si se aleja mucho de la línea LM, es otra señal de que el modelo clásico está distorsionado por datos extremos.
