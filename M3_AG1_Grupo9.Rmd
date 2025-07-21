@@ -1,0 +1,38 @@
+---
+title: "M3_AG1_Países extremos en la implantación de Facebook"
+author: "Lucía Menéndez y Milena Villanueva"
+date: "2025-07-20"
+output: html_document
+---
+
+```{r}
+
+# Paquetes necesarios
+required_packages <- c("tidyverse", "countrycode", "moments", "stargazer", "scales")
+
+# Instalar los paquetes que aún no estén instalados
+new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
+if(length(new_packages)) {
+  install.packages(new_packages, quiet = TRUE)
+}
+
+# Cargar las librerías
+library(tidyverse)
+library(countrycode)
+library(moments)
+library(scales) 
+library(stargazer) 
+
+# Cargar el dataset 'fb_final.csv' directamente desde la URL
+data_url <- "https://raw.githubusercontent.com/griu/mbdds_fc20/master/gestion_datos/www/fb_final.csv"
+datos_facebook <- read_csv2(data_url)
+
+# Verificación inicial de los datos
+ head(datos_facebook) # Muestra las primeras filas del dataframe cargado
+ summary(datos_facebook) # Proporciona un resumen estadístico de las columnas
+ colnames(datos_facebook) # Muestra los nombres de las columnas
+
+```
+## 1. Analiza mediante summary y boxplot, si hay (o no) países outliers respecto a la variable Facebook_por_Internet. Identifica cuáles son.
+
+
