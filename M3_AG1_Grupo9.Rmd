@@ -8,7 +8,7 @@ output: html_document
 ```{r}
 
 # Paquetes necesarios
-required_packages <- c("tidyverse", "countrycode", "moments", "stargazer", "scales", "corrplot")
+required_packages <- c("tidyverse", "countrycode", "moments", "stargazer", "scales", "corrplot", "kableExtra", "writexl")
 
 # Instalar los paquetes que aún no estén instalados
 new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
@@ -24,6 +24,9 @@ library(scales)
 library(stargazer) 
 library(MASS)
 library(corrplot)
+library(knitr)
+library(kableExtra)
+library(writexl)
 
 
 # URL del dataset
@@ -317,58 +320,50 @@ Explicar que faltan los datos de Facebook y cuál es la casuística.
 
 ```{r}
 
-#| fig.width: 5
-#| fig.height: 5
+# --- 1. Preparar los datos para la matriz de correlaciones combinada ---
+datos_para_pivot <- datos_facebook_extendido %>%
+  filter(anyo %in% c(2010, 2023)) %>%
+  dplyr::select(country_norm, anyo, facebook_num, internet_por_num, poblacion_num, internet_num, facebook_por_num, facebook_por_internet)
 
-# Calcular la variable 'internet_num' en el dataset principal
-datos_facebook_extendido <- datos_facebook %>%
-  mutate(internet_num = internet_por_num * poblacion_num / 100) # CAMBIO: Calcular internet_num para todo el dataset
+datos_correlacion_combinada_wide <- datos_para_pivot %>%
+  pivot_wider(
+    names_from = anyo,
+    names_glue = "{.value}_{anyo}",
+    values_from = c(facebook_num, internet_por_num, poblacion_num, internet_num, facebook_por_num, facebook_por_internet)
+  ) %>%
+  dplyr::select(-country_norm)
 
-# Matriz de correlaciones para 2010
-datos_correlacion_2010 <- datos_facebook_extendido %>% # CAMBIO: Usar el dataset extendido con 'internet_num'
-  filter(anyo == 2010) %>%
-  dplyr::select(facebook_num, internet_por_num, poblacion_num, internet_num, facebook_por_num, facebook_por_internet) # CAMBIO: Añadir variables solicitadas y facebook_por_num
+# --- 2. Calcular la matriz de correlaciones completa ---
+matriz_correlacion_combinada <- cor(datos_correlacion_combinada_wide, use = "pairwise.complete.obs")
 
-matriz_correlacion_2010 <- cor(datos_correlacion_2010, use = "pairwise.complete.obs")
-print("Matriz de Correlaciones para 2010:")
-print(matriz_correlacion_2010)
+print("Matriz de Correlaciones Completa (2010 y 2023 combinados - como tabla con scroll):")
 
-# Visualización del mapa de calor para 2010
-print("Mapa de calor de Correlaciones para 2010:")
-corrplot::corrplot(matriz_correlacion_2010,
-                   method = "color",
-                   type = "upper",
-                   order = "hclust",
-                   tl.col = "black",
-                   tl.srt = 45,
-                   addCoef.col = "black",
-                   col = colorRampPalette(c("red", "white", "green"))(200),
-                   diag = FALSE,
-                   title = "Correlaciones de Variables Numéricas - Año 2010") # CAMBIO: Añadir título al plot de 2010
+# Convertir la matriz a un data frame para kable y redondear los valores
+matriz_correlacion_df <- as.data.frame(matriz_correlacion_combinada) %>%
+  round(3) # Redondear a 3 decimales para mayor legibilidad
 
+# Usar kable para crear una tabla que puede tener scroll horizontal
+matriz_correlacion_df %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F) %>% # 'responsive' permite scroll
+  scroll_box(width = "100%", height = "400px") # Ajusta el ancho y alto según sea necesario para el scroll
 
-# Matriz de correlaciones para 2023
-datos_correlacion_2023 <- datos_facebook_extendido %>% # CAMBIO: Usar el dataset extendido con 'internet_num'
-  filter(anyo == 2023) %>%
-  dplyr::select(facebook_num, internet_por_num, poblacion_num, internet_num, facebook_por_num, facebook_por_internet) # CAMBIO: Añadir variables solicitadas y facebook_por_num
-
-matriz_correlacion_2023 <- cor(datos_correlacion_2023, use = "pairwise.complete.obs")
-print("Matriz de Correlaciones para 2023:")
-print(matriz_correlacion_2023)
-
-# Visualización del mapa de calor para 2023
-print("Mapa de calor de Correlaciones para 2023:")
-corrplot::corrplot(matriz_correlacion_2023,
-                   method = "color",
-                   type = "upper",
-                   order = "hclust",
-                   tl.col = "black",
-                   tl.srt = 45,
-                   addCoef.col = "black",
-                   col = colorRampPalette(c("red", "white", "green"))(200),
-                   diag = FALSE,
-                   title = "Correlaciones de Variables Numéricas - Año 2023") # CAMBIO: Añadir título al plot de 2023
-```
+# Puedes comentar o eliminar el código del heatmap si prefieres solo la tabla.
+# El código del heatmap anterior (con o sin los ajustes de cex) es una alternativa si decides volver a probarlo.
 
 ```
+
+```{r}
+
+# --- Exportar a Excel (.xlsx) para analizar mejor la matriz de correlaciones ---
+writexl::write_xlsx(matriz_correlacion_df, "matriz_correlacion_combinada.xlsx")
+print("Matriz de correlaciones exportada a 'matriz_correlacion_combinada.xlsx'")
+
+```
+Para imputar **facebook_num_2010**, las variables más predictivas son **internet_num_2010** (≈0.84), con una dependencia muy fuerte del acceso a internet en el mismo año. Seguidamente, **internet_num_2023** (≈0.75) y **facebook_num_2023** (≈0.75) también muestran una fuerte correlación positiva, indicando que el tamaño de la base de usuarios de internet y Facebook de un país mantiene una consistencia temporal. La **poblacion_num** en ambos años (2010 ≈0.63, 2023 ≈0.60) correlacionan con la respuesta, aunque en menor medida.
+
+Destacar también la alta correlación entre algunas de estas variables explicativas. Por ejemplo, **internet_num_2010** y **poblacion_num_2010** correlacionan fuertemente (≈0.82), al igual que sus contrapartes de 2023 (≈0.83). Más aún, las variables de **internet_num** entre años (≈0.90) y, especialmente, las de **poblacion_num** entre años (≈0.999) muestran una correlación casi perfecta.
+
+Esta multicolinealidad se deberá tener en cuenta en el proceso de imputación, ya que, aunque individualmente las variables puedan ser buenos predictores, la inclusión simultánea de variables altamente correlacionadas podría generar coeficientes inestables y dificultar la interpretación e individualización de los efectos independientes.
+
 
