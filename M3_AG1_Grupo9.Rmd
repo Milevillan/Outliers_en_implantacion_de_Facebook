@@ -176,6 +176,14 @@ Un segundo grupo está formado por países con una penetración de Facebook exce
 
 Finalmente, el tercer grupo lo conforman países con una penetración de Facebook notablemente baja entre sus usuarios de Internet, como Japón (1.57% en 2010 y 14.40% en 2023) y Corea del Sur (5.06% en 2010 y 19.66% en 2023); estos valores, aunque posibles, representan una desviación significativa de la norma en la relación analizada, indicando patrones de adopción atípicos o factores culturales diferenciadores.
 
+En cuanto a los posibles motivos de estos valores, también por grupo detectado serían:
+
+Grupo 1. Más allá de posibles errores de medición, prácticas culturales o limitaciones en la metodología de recopilación de datos. Por motivos culturales y socioeconómicos puede haber una mayor tendencia al uso compartido de dispositivos o cuentas, o el acceso a internet en puntos comunitarios, lo que podría inflar la cuenta de usuarios de una plataforma social en relación con los usuarios únicos de internet. 
+
+Grupo 2: Se trata de países con, probablemente, mayor predisposición a integrar rápidamente nuevas tecnologías de comunicación en su vida diaria, facilitando una expansión viral de las nuevas tecnologías y, con ellas, de las RRSS.
+
+Grupo 3: Probablemente por el impacto de un ecosistema tecnológico local fuerte y desarrollo anterior o paralelo de servicios análogos.
+
 
 ## 4. A partir del plot 4 y 5 del modelo, comenta si los valores de Leverage y la D Cook indican la presencia de outliers. En cada caso comenta si estos valores indican que hay o no un impacto relevante sobre el ajuste de la regresión y porqué.
 
@@ -316,7 +324,8 @@ print(registros_con_na)
 
 ```
 
-Explicar que faltan los datos de Facebook y cuál es la casuística.
+La tipología de valores faltantes en facebook_num_2010 se clasifica como **Missing at Random (MAR)** porque la probabilidad de que un dato falte no depende del valor ausente en sí mismo, sino de otras variables observadas en el dataset. En este contexto, es razonable suponer que la falta de datos sobre usuarios de Facebook en 2010 está ligada a características de los países como su penetración de internet en 2010 (internet_num_2010) o el número de usuarios de Facebook en 2023 (facebook_num_2023). Es decir, la razón de la ausencia de un dato se explica por otros datos que sí tenemos disponibles para ese país.
+
 
 ```{r}
 
@@ -367,3 +376,291 @@ Destacar también la alta correlación entre algunas de estas variables explicat
 Esta multicolinealidad se deberá tener en cuenta en el proceso de imputación, ya que, aunque individualmente las variables puedan ser buenos predictores, la inclusión simultánea de variables altamente correlacionadas podría generar coeficientes inestables y dificultar la interpretación e individualización de los efectos independientes.
 
 
+## 7. Realiza la imputación de valores faltantes de facebook_num para 2010 a partir de la estimación directa mediante un modelo de regresión (simple o múltiple). Como variable dependiente puedes usar Facebook_por_num si lo prefieres. Como variables independientes, puedes utilizar una o más variables del conjunto de datos analizado en el punto anterior. Explica en cada caso, porque has seleccionado la/las variables del modelo para la imputación.
+
+Para esta pregunta, probaremos dos opciones: Un modelo de **regresión múltiple** tomando las dos variables más correlacionadas:
+
+- Usaremos internet_num_2010 (la variable más correlacionada con facebook_num_2010), lo que indica su fuerte relación con la adopción de redes sociales.
+
+- Y facebook_num_2023, que es relevante por medir el mismo dato (usuarios de Facebook) en un año posterior, capturando la tendencia de crecimiento a largo plazo, y también está altamente correlacionada.
+
+Y por otro lado, un **modelo de regresión simple** tomando la variable más correlacionada:
+
+Aquí solo usaremos internet_num_2010, la más fuerte individualmente.
+
+Una vez entrenados los modelos, compararemos el rendimiento de ambos y nos quedaremos con el mejor.
+
+Ambos modelos usarán la transformación log1p en facebook_num_2010 para asegurar que nuestras predicciones sean positivas y coherentes con datos de conteo.
+
+
+```{r}
+
+# --- Identificar los datos con valores faltantes en facebook_num_2010 ---
+# Separar el conjunto de datos en entrenamiento (sin NA) y predicción (con NA)
+df_train_facebook_2010 <- datos_correlacion_combinada_wide %>%
+  filter(!is.na(facebook_num_2010))
+
+df_predict_facebook_2010 <- datos_correlacion_combinada_wide %>%
+  filter(is.na(facebook_num_2010))
+
+# --- Construir el Modelo 1: Regresión Lineal Múltiple con transformación logarítmica ---
+# Utilizamos 'internet_num_2010' y 'facebook_num_2023' como predictores
+model_imputacion_facebook_2010 <- lm(log1p(facebook_num_2010) ~ internet_num_2010 + facebook_num_2023, data = df_train_facebook_2010)
+
+# --- 1. Resumen del Modelo 1 ---
+print("--- Resumen del Modelo de Regresión Múltiple (Modelo 1) ---")
+print(summary(model_imputacion_facebook_2010))
+
+# --- 2. Residuos y Métricas de Rendimiento en la Escala Original ---
+print("\n--- Métricas de Rendimiento del Modelo 1 en la Escala Original ---")
+
+# Obtener los valores reales y predichos para el conjunto de entrenamiento (en escala log1p)
+actual_log1p_train <- log1p(df_train_facebook_2010$facebook_num_2010)
+predicted_log1p_train_model1 <- predict(model_imputacion_facebook_2010, newdata = df_train_facebook_2010)
+
+# Convertir los valores a la escala original (número de personas)
+actual_facebook_num_2010_train <- expm1(actual_log1p_train)
+predicted_facebook_num_2010_train_model1 <- expm1(predicted_log1p_train_model1)
+
+# Calcular los residuos en la escala original
+residuals_original_scale_model1 <- actual_facebook_num_2010_train - predicted_facebook_num_2010_train_model1
+
+# Resumen de los residuos en la escala original
+print("Resumen de los residuos en la escala original (número de personas):")
+print(summary(residuals_original_scale_model1))
+
+# Calcular RMSE y MAE en la escala original
+rmse_original_scale_model1 <- sqrt(mean(residuals_original_scale_model1^2))
+mae_original_scale_model1 <- mean(abs(residuals_original_scale_model1))
+
+print(paste0("RMSE (Root Mean Squared Error) en la escala original: ", round(rmse_original_scale_model1, 2), " personas"))
+print(paste0("MAE (Mean Absolute Error) en la escala original: ", round(mae_original_scale_model1, 2), " personas"))
+
+
+
+# --- 4. Tabla de Valores Imputados del Modelo 1 y Datos Relacionados ---
+print("\n--- Tabla de Países con Valores Imputados (Modelo 1 - Regresión Múltiple) y Datos Relacionados ---")
+
+# Realizar la imputación con el Modelo 1 para los datos de predicción (los países con NA)
+imputed_values_facebook_2010_log_model1_predict <- predict(model_imputacion_facebook_2010, newdata = df_predict_facebook_2010)
+imputed_values_facebook_2010_model1_predict <- expm1(imputed_values_facebook_2010_log_model1_predict)
+imputed_values_facebook_2010_model1_predict[imputed_values_facebook_2010_model1_predict < 0] <- 0
+
+# Crear la tabla final
+final_imputation_table_model1 <- data.frame(
+  Pais = rownames(df_predict_facebook_2010),
+  Facebook_num_2010_Imputado_Modelo1 = as.numeric(imputed_values_facebook_2010_model1_predict),
+  Facebook_num_2023 = df_predict_facebook_2010$facebook_num_2023,
+  Internet_por_num_2010 = df_predict_facebook_2010$internet_por_num_2010,
+  Internet_por_num_2023 = df_predict_facebook_2010$internet_por_num_2023
+)
+
+print(final_imputation_table_model1)
+
+```
+```{r}
+#Modelo 2:
+
+# 1. Definir y entrenar el Modelo 2 (Regresión Simple)
+#    Utilizamos 'internet_num_2010' como único predictor
+model_imputacion_facebook_2010_model2 <- lm(log1p(facebook_num_2010) ~ internet_num_2010, data = df_train_facebook_2010)
+
+# 2. Resumen del Modelo 2
+print("Resumen del Modelo de Regresión Simple (Modelo 2):")
+print(summary(model_imputacion_facebook_2010_model2))
+
+# 3. Realizar la imputación con el Modelo 2
+imputed_values_facebook_2010_log_model2 <- predict(model_imputacion_facebook_2010_model2, newdata = df_predict_facebook_2010)
+imputed_values_facebook_2010_model2 <- expm1(imputed_values_facebook_2010_log_model2)
+# Asegurarse de no tener valores negativos residuales después de la transformación inversa
+imputed_values_facebook_2010_model2[imputed_values_facebook_2010_model2 < 0] <- 0
+
+# 4. Crear la tabla final con los valores imputados y los datos originales relevantes
+final_imputation_table_model2 <- data.frame(
+  Pais = rownames(df_predict_facebook_2010),
+  Facebook_num_2010_Imputado_Modelo2 = as.numeric(imputed_values_facebook_2010_model2),
+  Facebook_num_2023 = df_predict_facebook_2010$facebook_num_2023,
+  Internet_por_num_2010 = df_predict_facebook_2010$internet_por_num_2010,
+  Internet_por_num_2023 = df_predict_facebook_2010$internet_por_num_2023
+)
+
+# 5. Mostrar la tabla
+print("Tabla de Países con Valores Imputados (Modelo 2 - Regresión Simple) y Datos Relacionados:")
+print(final_imputation_table_model2)
+
+```
+
+
+El Modelo 1 (**regresión lineal múltiple**) es el más adecuado para imputar los valores faltantes de facebook_num_2010. Este modelo captura el 44.31% de la variabilidad en la variable dependiente (un R-cuadrado superior al 35.18% del Modelo 2), indicando un mejor ajuste a los datos.
+
+Aunque las métricas de error absoluto en la escala original (como el RMSE de 77 millones de personas) son elevadas, lo cual sugiere limitaciones del modelo lineal para la escala de conteo global, las imputaciones son coherentes: los valores estimados para **facebook_num_2010** son menores que los valores reales de **facebook_num_2023** para los mismos países. Esta relación temporal lógica, junto con la tendencia creciente observada en los datos de **internet_por_num_2010** y **internet_por_num_2023**, refuerza que el modelo captura patrones válidos de crecimiento y adopción digital.
+
+##  8. Imputa de nuevo los valores faltantes de 2010 utilizando bootstrap (m=10 simulaciones) a partir del modelo de regresión del punto anterior (punto7). Para cada país con valores faltantes, presenta los 5 valores imputados, su media y desviación típica. Comenta, desde el punto de vista teórico, porque las estimaciones de valores faltantes, obtenidas aplicando Bootstrap, son mejores que las estimaciones directas obtenidas a partir de la regresión (punto 7) para su uso futuro en el ajuste de nuevos modelos con estos datos imputados.
+
+
+```{r}
+
+# --- Parámetros para la Imputación Bootstrap ---
+num_simulations <- 10 # Número de simulaciones (m)
+bootstrap_sample_percentage <- 0.8 # Porcentaje del tamaño de la muestra de entrenamiento para cada bootstrap
+
+# Obtener el número de observaciones en el conjunto de entrenamiento
+n_train <- nrow(df_train_facebook_2010)
+
+# Calcular el tamaño fijo para cada muestra bootstrap (ej. 80% del training data)
+fixed_bootstrap_sample_size <- round(n_train * bootstrap_sample_percentage)
+
+# Crear una matriz para almacenar los valores imputados de todas las simulaciones
+# Cada columna será una simulación, cada fila un país a imputar
+imputed_values_matrix <- matrix(NA, nrow = nrow(df_predict_facebook_2010), ncol = num_simulations)
+rownames(imputed_values_matrix) <- rownames(df_predict_facebook_2010)
+
+# --- Realizar las Simulaciones Bootstrap ---
+print(paste0("Iniciando ", num_simulations, " simulaciones Bootstrap para la imputación de facebook_num_2010..."))
+
+for (i in 1:num_simulations) {
+  # 1. Crear una muestra bootstrap (con reemplazo y tamaño fijo) del conjunto de entrenamiento
+  bootstrap_indices <- sample(1:n_train, size = fixed_bootstrap_sample_size, replace = TRUE)
+  bootstrap_sample <- df_train_facebook_2010[bootstrap_indices, ]
+
+  # 2. Entrenar un nuevo modelo de regresión en la muestra bootstrap
+  # Se usa la estructura del Modelo 1 de la Pregunta 7 (regresión múltiple)
+  current_bootstrap_model <- lm(log1p(facebook_num_2010) ~ internet_num_2010 + facebook_num_2023, data = bootstrap_sample)
+
+  # 3. Predecir los valores faltantes para df_predict_facebook_2010
+  predicted_log1p_current_sim <- predict(current_bootstrap_model, newdata = df_predict_facebook_2010)
+
+  # 4. Transformar las predicciones de vuelta a la escala original (expm1)
+  predicted_original_current_sim <- expm1(predicted_log1p_current_sim)
+
+  # Asegurar que no haya valores imputados negativos (aunque expm1 lo maneja bien para log1p)
+  predicted_original_current_sim[predicted_original_current_sim < 0] <- 0
+
+  # 5. Almacenar las predicciones de esta simulación en la matriz
+  imputed_values_matrix[, i] <- predicted_original_current_sim
+}
+
+print("Simulaciones Bootstrap completadas.")
+
+# --- Calcular la Media y Desviación Típica para cada país imputado ---
+# Crear un dataframe para almacenar los resultados consolidados
+bootstrap_imputation_results <- data.frame(
+  Pais = rownames(imputed_values_matrix),
+  stringsAsFactors = FALSE
+)
+
+# Añadir las 10 columnas de valores imputados individuales al dataframe de resultados
+for (i in 1:num_simulations) {
+  bootstrap_imputation_results[[paste0("Imputed_Val_", i)]] <- imputed_values_matrix[, i]
+}
+
+# Calcular la Media y Desviación Típica para cada fila (país)
+bootstrap_imputation_results$Mean_Imputed_Value <- rowMeans(imputed_values_matrix)
+bootstrap_imputation_results$SD_Imputed_Value <- apply(imputed_values_matrix, 1, sd)
+
+# --- Presentar los resultados ---
+print("\n--- Resultados de Imputación por Bootstrap (m=10 simulaciones) ---")
+for (i in 1:nrow(bootstrap_imputation_results)) {
+  country_name <- bootstrap_imputation_results$Pais[i]
+  # Obtener todos los 10 valores imputados para el país actual
+  imputed_vals <- as.numeric(imputed_values_matrix[i, ]) 
+  
+  # Mostrar los primeros 5 valores imputados (o menos si hay menos de 5 simulaciones)
+  display_values <- head(imputed_vals, 5) 
+  
+  mean_val <- bootstrap_imputation_results$Mean_Imputed_Value[i]
+  sd_val <- bootstrap_imputation_results$SD_Imputed_Value[i]
+  
+  cat(paste0("\nPaís: ", country_name, "\n"))
+  cat(paste0("  Valores Imputados (primeros 5): ", paste(round(display_values, 0), collapse = ", "), "\n"))
+  cat(paste0("  Media de Imputación: ", round(mean_val, 0), " personas\n"))
+  cat(paste0("  Desviación Típica de Imputación: ", round(sd_val, 0), " personas\n"))
+}
+
+
+```
+Las estimaciones mediante Bootstrap son superiores a una regresión lineal porque tiene la capacidad de Bootstrap para reconocer y cuantificar la incertidumbre asociada a la estimación de datos no observados. Mientras que una imputación directa proporciona un único valor puntual para cada dato faltante, creando una ilusión de precisión, el Bootstrap devuelve múltiples valores plausibles (como hemos visto en los 10 valores generados para cada país, de los cuales mostramos los primeros 5). Esta multiplicidad nos permite calcular una desviación típica de imputación, la cual es una medida directa de la variabilidad que existe en torno a la media imputada.
+
+Una imputación única puede subestimar la variabilidad real presente en el conjunto de datos completo, lo que a su vez conduce a errores estándar sesgados. El impacto que esto tendría en siguientes pasos del proyecto, sería estrechar los intervalos de confianza en los parámetros de los modelos futuros y podríamos tener una significancia estadística (p-values) artificialmente alta. Al generar y combinar múltiples imputaciones mediante simulaciones, podemos preservar mejor la variabilidad original de los datos. 
+
+En conclusión, el enfoque Bootstrap nos da una base más sólida y rigurosa para extraer conclusiones estadísticas válidas a partir de los datos que -ahora- incluyen valores imputados.
+
+## 9. Para cada país con valores faltantes en 2010, compara mediante una tabla resumen, los valores estimados en el punto 7 (imputacion_directa_pais), con la media del país (media_bootsrap_pais) y desviación típica (desviacion_tipica_bootsrap_pais) de las m=10 estimaciones obtenidas mediante bootstrap en el punto 8. Cuantifica, para cada país (desviación_imputacion_directa_pais), cuántas desviaciones típicas se desvían las imputaciones directas del punto 7, respecto de la media del proceso Bootstrap.
+
+```{r}
+
+# --- 1. Obtener la Imputación Directa del Punto 7 (Modelo 1) ---
+# Entrenar el mejor modelo del Punto 7 (Modelo 1) una única vez en el conjunto de entrenamiento completo
+# Esta es la misma estructura de modelo usada para las simulaciones Bootstrap.
+direct_imputation_model <- lm(log1p(facebook_num_2010) ~ internet_num_2010 + facebook_num_2023, data = df_train_facebook_2010)
+
+# Predecir los valores faltantes usando este modelo directo
+predicted_log1p_direct <- predict(direct_imputation_model, newdata = df_predict_facebook_2010)
+
+# Transformar las predicciones de vuelta a la escala original (número de personas)
+imputacion_directa_pais_values <- expm1(predicted_log1p_direct)
+
+# Asegurarse de que no haya valores imputados negativos
+imputacion_directa_pais_values[imputacion_directa_pais_values < 0] <- 0
+
+# Crear un dataframe temporal para las imputaciones directas, usando los nombres de país como identificador
+direct_imputation_df <- data.frame(
+  Pais = rownames(df_predict_facebook_2010),
+  imputacion_directa_pais = as.numeric(imputacion_directa_pais_values),
+  stringsAsFactors = FALSE
+)
+
+# --- 2. Combinar con los resultados Bootstrap y calcular la Desviación ---
+# Se asume que 'bootstrap_imputation_results' está disponible del paso anterior (Punto 8)
+# y contiene las columnas 'Pais', 'Mean_Imputed_Value' y 'SD_Imputed_Value'.
+
+# Fusionar los resultados de la imputación directa con los resultados resumidos de Bootstrap
+comparison_table <- merge(direct_imputation_df, 
+                          bootstrap_imputation_results %>% 
+                            dplyr::select(Pais, Mean_Imputed_Value, SD_Imputed_Value), # Usar dplyr::select explícitamente
+                          by = "Pais", 
+                          all.x = TRUE) # Asegura que todos los países estén incluidos
+
+# Renombrar las columnas para que coincidan exactamente con la nomenclatura solicitada
+colnames(comparison_table)[colnames(comparison_table) == "Mean_Imputed_Value"] <- "media_bootsrap_pais"
+colnames(comparison_table)[colnames(comparison_table) == "SD_Imputed_Value"] <- "desviacion_tipica_bootsrap_pais"
+
+# Calcular la 'desviación_imputacion_directa_pais'
+# Se añade una pequeña constante al denominador para evitar división por cero si la desviación típica es 0,
+# aunque en la práctica con m=10 y datos reales, esto es muy raro.
+comparison_table$desviacion_imputacion_directa_pais <- (
+  comparison_table$imputacion_directa_pais - comparison_table$media_bootsrap_pais
+) / (comparison_table$desviacion_tipica_bootsrap_pais + .Machine$double.eps) # Añade épsilon para evitar div/0
+
+# --- 3. Presentar la Tabla Resumen Comparativa ---
+print("\n--- Tabla Comparativa de Imputaciones Directas vs. Bootstrap ---")
+# Opcional: Redondear los valores para una mejor legibilidad en la consola
+comparison_table_formatted <- comparison_table %>%
+  mutate(
+    imputacion_directa_pais = round(imputacion_directa_pais, 0),
+    media_bootsrap_pais = round(media_bootsrap_pais, 0),
+    desviacion_tipica_bootsrap_pais = round(desviacion_tipica_bootsrap_pais, 0),
+    desviacion_imputacion_directa_pais = round(desviacion_imputacion_directa_pais, 2)
+  )
+
+print(comparison_table_formatted)
+
+# Puedes descomentar la siguiente línea si prefieres ver la tabla original sin redondear
+# print(comparison_table)
+
+```
+
+Los valores de imputación directa del Punto 7 son, en general, muy próximos a la media de las 10 simulaciones Bootstrap para cada país. Esto sugiere que nuestro modelo de regresión inicial (el del Punto 7) es un buen estimador central.
+
+Ahora bien, la Std Dv en algunos casos es elevada. Por poner un ejemplo, para Afganistán, la media de imputación es de aproximadamente 1.203.027 personas, pero su desviación típica es de 258.143 personas. Esto nos indica el rango de incertidumbre alrededor de esa media: el valor real de usuarios de Facebook en 2010 para Afganistán podría razonablemente variar en cientos de miles de personas. Si solo hubiésemos usado la imputación directa, no tendríamos esta información sobre la variabilidad.
+
+Por otro lado, si cuantificamos la desviación de la imputación directa de la media Bootstrap en términos de desviaciones típicas (desviación_imputacion_directa_pais), vemos que estos valores son generalmente pequeños (la mayoría por debajo de 0.5). Esto nos indica que la imputación directa se encuentra bien dentro del rango esperado de variabilidad que arrojan las simulaciones Bootstrap. Por ejemplo, para Iraq, la imputación directa se desvía solo 0.22 desviaciones típicas de la media Bootstrap, lo que la sitúa cerca del centro de la distribución de las imputaciones.
+
+
+## 10. A partir de los resultados obtenidos, comenta de forma cualitativa, si las estimaciones obtenidas mediante bootstrap efectivamente son o no mejores para su uso futuro en el ajuste de nuevos modelos a partir de estos datos de 2010 y 2023. ¿Ves algún riesgo, para el desarrollo de futuros modelos a partir de estos datos, en imputar los valores de 2010 a partir de valores de 2023?
+
+Las estimaciones de valores faltantes conseguidas mediante el método Bootstrap son mejores para su uso futuro en el ajuste de nuevos modelos a partir de estos datos de 2010 y 2023. Si bien la imputación directa nos proporcionó un valor puntual, el proceso Bootstrap captura la incertidumbre inherente a la estimación de datos no observados (como se ve en las desviaciones típicas que calculamos para cada país). Ignorar esta variabilidad inherente, como lo haría una imputación única, llevaría a una subestimación del error en cualquier modelo futuro que utilice estos datos, generando una falsa sensación de precisión y optimismo en los resultados (por ejemplo, intervalos de confianza demasiado estrechos o p-valores inflados). El enfoque Bootstrap, al proporcionar un rango de valores plausibles (cuantificado por la media y la desviación típica), permite que los modelos subsiguientes incorporen esta incertidumbre, resultando en una inferencia estadística más válida, robusta y, por tanto, en decisiones mejor informadas.
+
+En cuanto a los riesgos asociados a imputar los valores de 2010 a partir de valores de 2023 para el desarrollo de futuros modelos, principalmente serían la temporalidad y la causalidad. Es decir, estamos usando datos del "futuro" (2023) para estimar datos del "pasado" (2010), introduciendo un sesgo "look-ahead bias" o sesgo de anticipación. El modelo de imputación está utiliza información que no estaría disponible en el momento en que ocurrieron los datos de 2010. Si el objetivo final es construir un modelo predictivo o explicativo donde se simulen condiciones reales y, por tanto, donde solo se tenga acceso a la información disponible hasta el momento de la predicción, la imputación basada en datos futuros haría que el rendimiento del modelo pareciera artificialmente bueno, y performaría necesariamente peor en *producción*. 
+
+En suma, si se trata de un análisis puntual o un modelo que deberá trabajar sobre datos del pasado, no veríamos mayor riesgo. Ahora bien, si la finalidad del proyecto final es productivizar un modelo que prediga datos futuros, usar esta técnica nos lleva a conclusiones engañosas sobre la capacidad predictiva o explicativa de los modelos desarrollados a partir de estos datos imputados.
