@@ -95,6 +95,7 @@ En el análisis de la variable **Facebook_por_Internet** se observan cuatro valo
 En cuanto a la naturaleza de estos outliers sugiere una **inconsistencia** lógica en los datos, donde el porcentaje de usuarios de Facebook sobrepasa el 100% de los usuarios de Internet. Dado que el acceso a Internet es un prerrequisito para la utilización de Facebook, esta anomalía indica probablemente un error de medición, ya sea en las cifras de penetración de Internet o en el recuento de usuarios de Facebook para los países y años mencionados.
 
 
+
 ## 2. Ajusta, de nuevo, los modelos de la actividad 4 de facebook_por_num sobre internet_por_num separados por año. Dibuja el primer plot (es decir, plot(modelo,1)) del modelo de regresión de cada año. Analiza los residuos de cada modelo (2010 y 2023) e identifica los países outliers con un nivel de confianza del 95% en 2010 y en 2023. Comenta si son distintos a los outliers detectados en el punto anterior mediante boxplot.
 
 
@@ -172,17 +173,14 @@ print(datos_outliers) # Usamos print para verlo en consola si no estás en Rmd y
 
 Se observan tres casuísticas distintas según el valor de la variable **facebook_por_internet.** Por un lado, los casos donde el porcentaje de usuarios de Facebook supera el de usuarios de Internet, lo que constituye una inconsistencia lógica y sugiere errores de medición. Ejemplos claros son Bolivia 2023 con 102.38% , Camboya 2023 con 125.28%, El Salvador 2023 con 110.03%, e Indonesia 2010 con 107.27%. 
 
-Un segundo grupo está formado por países con una penetración de Facebook excepcionalmente alta respecto a los usuarios de Internet, rozando la saturación; Chile 2010 con un 98.94% es un ejemplo de esta alta adopción que lo desvía de la tendencia general. 
+Algunos motivos que hayan podido llevar a errores de medición: el más claro, falta de recursos del país y los organismos que recopilan esta información, para realizar buenas estimaciones del uso de internet. Por otro lado, por motivos culturales y socioeconómicos puede haber una mayor tendencia al uso compartido de dispositivos o cuentas, o el acceso a internet en puntos comunitarios, lo que podría inflar la cuenta de usuarios de una plataforma social en relación con los usuarios únicos de internet. 
+
+Un segundo grupo está formado por países con una penetración de Facebook excepcionalmente alta respecto a los usuarios de Internet, rozando la saturación; Chile 2010 con un 98.94% es un ejemplo de esta alta adopción que lo desvía de la tendencia general. Es posible que el fenómeno sea similar al anterior, aunque en este caso no caiga en una inconsistencia lógica.
 
 Finalmente, el tercer grupo lo conforman países con una penetración de Facebook notablemente baja entre sus usuarios de Internet, como Japón (1.57% en 2010 y 14.40% en 2023) y Corea del Sur (5.06% en 2010 y 19.66% en 2023); estos valores, aunque posibles, representan una desviación significativa de la norma en la relación analizada, indicando patrones de adopción atípicos o factores culturales diferenciadores.
 
-En cuanto a los posibles motivos de estos valores, también por grupo detectado serían:
+Este último grupo se podría explicar principalmente por la existencia de otros servicios análogos, que tuvieron una expansión y penetración mayor en estos países: Cyworld en Corea y Line en Japón (fuentes: [Language Trainers](https://www.languagetrainers.com/blog/a-guide-to-social-media-in-south-korea-facebook-twitter-and-other-sites/) y [JapanBuzz](https://www.japanbuzz.info/social-media-in-japan/)).
 
-Grupo 1. Más allá de posibles errores de medición, prácticas culturales o limitaciones en la metodología de recopilación de datos. Por motivos culturales y socioeconómicos puede haber una mayor tendencia al uso compartido de dispositivos o cuentas, o el acceso a internet en puntos comunitarios, lo que podría inflar la cuenta de usuarios de una plataforma social en relación con los usuarios únicos de internet. 
-
-Grupo 2: Se trata de países con, probablemente, mayor predisposición a integrar rápidamente nuevas tecnologías de comunicación en su vida diaria, facilitando una expansión viral de las nuevas tecnologías y, con ellas, de las RRSS.
-
-Grupo 3: Probablemente por el impacto de un ecosistema tecnológico local fuerte y desarrollo anterior o paralelo de servicios análogos.
 
 
 ## 4. A partir del plot 4 y 5 del modelo, comenta si los valores de Leverage y la D Cook indican la presencia de outliers. En cada caso comenta si estos valores indican que hay o no un impacto relevante sobre el ajuste de la regresión y porqué.
@@ -260,6 +258,7 @@ Algunos países con residuos moderados pueden tener alta distancia de Cook si su
 No todos los outliers detectados por residuos coinciden con los de Cook/Leverage. Por tanto, ambos análisis son complementarios: los residuos nos indican si el país se ajusta mal, y Cook/Leverage si tiene un impacto fuerte en la recta.
 
 
+
 ## 5. Ajusta, ahora, los mismos modelos que en el punto 3, utilizando la versión robusta rlm de la librería MASS (algoritmo de los M-Estimadores). Presenta la comparación de los modelos lm y rlm mediante la función stargazer y en un gráfico de dispersión con las rectas de regresión (lm, rlm y loess). Comenta si observas cambios relevantes en el gráfico de las rectas de regresión, y en los coeficientes del modelo rlm respecto al modelo lm (algoritmo de mínimos cuadrados).
 
 ```{r}
@@ -303,11 +302,9 @@ Al comparar los modelos clásicos (lm) y robustos (rlm), se observa que los coef
 En el gráfico, la línea roja (modelo robusto) difiere de la azul (LM) principalmente en el tramo bajo de internet (países con menor conectividad), donde algunos valores atípicos afectan al ajuste.
 La línea loess (verde) actúa como referencia no paramétrica: si se aleja mucho de la línea LM, es otra señal de que el modelo clásico está distorsionado por datos extremos.
 
-Añado cosas:
-
 Para ambos años, el modelo RLM muestra una pendiente consistentemente más pronunciada que el modelo LM. En 2010, la pendiente de RLM es 0.438, mientras que la de LM es 0.403. En 2023, la pendiente de RLM es 0.601, comparado con 0.544 de LM. Esto indica que la regresión robusta estima un mayor incremento en el porcentaje de usuarios de Facebook por cada punto porcentual de aumento en la penetración de Internet, al mitigar la influencia de los outliers.
 
-La reducción del residual std. error confirma que los modelos robustos logran un mejor ajuste a la mayoría de los datos al minimizar la influencia de las observaciones atípicas.
+La reducción del residual std. error confirma que los modelos robustos en este caso logran un mejor ajuste a la mayoría de los datos al minimizar la influencia de las observaciones atípicas.
 
 
 
@@ -323,6 +320,7 @@ print("Registros de datos con valores faltantes:")
 print(registros_con_na)
 
 ```
+
 
 La tipología de valores faltantes en facebook_num_2010 se clasifica como **Missing at Random (MAR)** porque la probabilidad de que un dato falte no depende del valor ausente en sí mismo, sino de otras variables observadas en el dataset. En este contexto, es razonable suponer que la falta de datos sobre usuarios de Facebook en 2010 está ligada a características de los países como su penetración de internet en 2010 (internet_num_2010) o el número de usuarios de Facebook en 2023 (facebook_num_2023). Es decir, la razón de la ausencia de un dato se explica por otros datos que sí tenemos disponibles para ese país.
 
@@ -374,6 +372,7 @@ Para imputar **facebook_num_2010**, las variables más predictivas son **interne
 Destacar también la alta correlación entre algunas de estas variables explicativas. Por ejemplo, **internet_num_2010** y **poblacion_num_2010** correlacionan fuertemente (≈0.82), al igual que sus contrapartes de 2023 (≈0.83). Más aún, las variables de **internet_num** entre años (≈0.90) y, especialmente, las de **poblacion_num** entre años (≈0.999) muestran una correlación casi perfecta.
 
 Esta multicolinealidad se deberá tener en cuenta en el proceso de imputación, ya que, aunque individualmente las variables puedan ser buenos predictores, la inclusión simultánea de variables altamente correlacionadas podría generar coeficientes inestables y dificultar la interpretación e individualización de los efectos independientes.
+
 
 
 ## 7. Realiza la imputación de valores faltantes de facebook_num para 2010 a partir de la estimación directa mediante un modelo de regresión (simple o múltiple). Como variable dependiente puedes usar Facebook_por_num si lo prefieres. Como variables independientes, puedes utilizar una o más variables del conjunto de datos analizado en el punto anterior. Explica en cada caso, porque has seleccionado la/las variables del modelo para la imputación.
@@ -495,6 +494,8 @@ El Modelo 1 (**regresión lineal múltiple**) es el más adecuado para imputar l
 
 Aunque las métricas de error absoluto en la escala original (como el RMSE de 77 millones de personas) son elevadas, lo cual sugiere limitaciones del modelo lineal para la escala de conteo global, las imputaciones son coherentes: los valores estimados para **facebook_num_2010** son menores que los valores reales de **facebook_num_2023** para los mismos países. Esta relación temporal lógica, junto con la tendencia creciente observada en los datos de **internet_por_num_2010** y **internet_por_num_2023**, refuerza que el modelo captura patrones válidos de crecimiento y adopción digital.
 
+
+
 ##  8. Imputa de nuevo los valores faltantes de 2010 utilizando bootstrap (m=10 simulaciones) a partir del modelo de regresión del punto anterior (punto7). Para cada país con valores faltantes, presenta los 5 valores imputados, su media y desviación típica. Comenta, desde el punto de vista teórico, porque las estimaciones de valores faltantes, obtenidas aplicando Bootstrap, son mejores que las estimaciones directas obtenidas a partir de la regresión (punto 7) para su uso futuro en el ajuste de nuevos modelos con estos datos imputados.
 
 
@@ -585,6 +586,8 @@ Una imputación única puede subestimar la variabilidad real presente en el conj
 
 En conclusión, el enfoque Bootstrap nos da una base más sólida y rigurosa para extraer conclusiones estadísticas válidas a partir de los datos que -ahora- incluyen valores imputados.
 
+
+
 ## 9. Para cada país con valores faltantes en 2010, compara mediante una tabla resumen, los valores estimados en el punto 7 (imputacion_directa_pais), con la media del país (media_bootsrap_pais) y desviación típica (desviacion_tipica_bootsrap_pais) de las m=10 estimaciones obtenidas mediante bootstrap en el punto 8. Cuantifica, para cada país (desviación_imputacion_directa_pais), cuántas desviaciones típicas se desvían las imputaciones directas del punto 7, respecto de la media del proceso Bootstrap.
 
 ```{r}
@@ -657,6 +660,7 @@ Ahora bien, la Std Dv en algunos casos es elevada. Por poner un ejemplo, para Af
 Por otro lado, si cuantificamos la desviación de la imputación directa de la media Bootstrap en términos de desviaciones típicas (desviación_imputacion_directa_pais), vemos que estos valores son generalmente pequeños (la mayoría por debajo de 0.5). Esto nos indica que la imputación directa se encuentra bien dentro del rango esperado de variabilidad que arrojan las simulaciones Bootstrap. Por ejemplo, para Iraq, la imputación directa se desvía solo 0.22 desviaciones típicas de la media Bootstrap, lo que la sitúa cerca del centro de la distribución de las imputaciones.
 
 
+
 ## 10. A partir de los resultados obtenidos, comenta de forma cualitativa, si las estimaciones obtenidas mediante bootstrap efectivamente son o no mejores para su uso futuro en el ajuste de nuevos modelos a partir de estos datos de 2010 y 2023. ¿Ves algún riesgo, para el desarrollo de futuros modelos a partir de estos datos, en imputar los valores de 2010 a partir de valores de 2023?
 
 Las estimaciones de valores faltantes conseguidas mediante el método Bootstrap son mejores para su uso futuro en el ajuste de nuevos modelos a partir de estos datos de 2010 y 2023. Si bien la imputación directa nos proporcionó un valor puntual, el proceso Bootstrap captura la incertidumbre inherente a la estimación de datos no observados (como se ve en las desviaciones típicas que calculamos para cada país). Ignorar esta variabilidad inherente, como lo haría una imputación única, llevaría a una subestimación del error en cualquier modelo futuro que utilice estos datos, generando una falsa sensación de precisión y optimismo en los resultados (por ejemplo, intervalos de confianza demasiado estrechos o p-valores inflados). El enfoque Bootstrap, al proporcionar un rango de valores plausibles (cuantificado por la media y la desviación típica), permite que los modelos subsiguientes incorporen esta incertidumbre, resultando en una inferencia estadística más válida, robusta y, por tanto, en decisiones mejor informadas.
@@ -664,3 +668,5 @@ Las estimaciones de valores faltantes conseguidas mediante el método Bootstrap 
 En cuanto a los riesgos asociados a imputar los valores de 2010 a partir de valores de 2023 para el desarrollo de futuros modelos, principalmente serían la temporalidad y la causalidad. Es decir, estamos usando datos del "futuro" (2023) para estimar datos del "pasado" (2010), introduciendo un sesgo "look-ahead bias" o sesgo de anticipación. El modelo de imputación está utiliza información que no estaría disponible en el momento en que ocurrieron los datos de 2010. Si el objetivo final es construir un modelo predictivo o explicativo donde se simulen condiciones reales y, por tanto, donde solo se tenga acceso a la información disponible hasta el momento de la predicción, la imputación basada en datos futuros haría que el rendimiento del modelo pareciera artificialmente bueno, y performaría necesariamente peor en *producción*. 
 
 En suma, si se trata de un análisis puntual o un modelo que deberá trabajar sobre datos del pasado, no veríamos mayor riesgo. Ahora bien, si la finalidad del proyecto final es productivizar un modelo que prediga datos futuros, usar esta técnica nos lleva a conclusiones engañosas sobre la capacidad predictiva o explicativa de los modelos desarrollados a partir de estos datos imputados.
+
+Nota: para esta respuesta hemos consultado este [artículo](https://fastercapital.com/content/Lookahead-bias-in-machine-learning--Enhancing-predictive-models.html#Understanding-lookahead-bias-in-machine-learning), donde se trata el problema de modelizar (aunque se refiere a modelos de machine learning), incluyendo datos del futuro.
